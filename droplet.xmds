@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simulation xmds-version="2">
+  <name>Droplet</name>
+
+  <author>skyline</author>
+  <description>
+      Phase separation of binary liquids 
+  </description>
+
+  <features>
+    <benchmark />
+    <auto_vectorise />
+    <fftw plan="patient" />
+    <globals>
+      <![CDATA[
+        real c_plus = 0.;
+        real c_minus = 1.;
+        real eps = 0.1;
+      ]]>
+    </globals>
+    <arguments append_args_to_output_filename="yes">
+      <argument name="r0" type="real" default_value="5" />
+      <argument name="r1" type="real" default_value="5" />
+    </aarguments>
+  </features>
+
+  <geometry>
+    <propagation_dimension> t </propagation_dimension>
+    <transverse_dimensions>
+      <dimension name="x" lattice="256" domain="(-64, 64)" />
+      <dimension name="y" lattice="256" domain="(-64, 64)" />
+    </transverse_dimensions>
+  </geometry>
+
+  <!-- <driver name="distributed-mpi" /> -->
+
+  <noise_vector name="UniformNoise" dimensions="x y" kind="uniform" type="real" method="dsfmt" seed="314 159 276">
+    <components>Eta</components>
+  </noise_vector>
+
+  <vector name="concentration" dimensions="x y" initial_basis="x y" type="complex">
+    <components>phi</components>
+    <initialisation>
+      <dependencies>UniformNoise</dependencies>
+      <!-- one droplet in the center -->
+      <!-- <![CDATA[
+        real c_infty = c_plus + eps;
+        real dis = sqrt(x * x + y * y);
+        if (dis > r0)
+          dis = -dis;
+        phi = 0.5 * (c_minus + c_infty) + 0.5 * (c_minus - c_infty) * tanh(dis) + 0.01 * (Eta - 0.5);
+      ]]> -->
+      <!-- two droplets -->
+      <![CDATA[
+        real c_infty = c_plus + eps;
+        real dis1 = sqrt((x-32) * (x-32) + y * y);
+        if (dis1 > r0)
+          dis1 = -dis1;
+        real dis2 = sqrt((x+32) * (x+32) + y * y);
+        if (dis2 > r1)
+          dis2 = -dis2;
+        real h = 0.5 * (tanh(dis1) + tanh(dis2) + 2) * (c_minus - c_infty);
+        phi = c_infty + h + 0.01 * (Eta - 0.5);
+      ]]>
+    </initialisation>
+  </vector>
+
+  <computed_vector name="mu_bulk" dimensions="x y" type="complex">
+    <components>f</components>
+    <evaluation>
+      <dependencies> concentration </dependencies>
+      <![CDATA[
+        f = (phi - c_plus) * (phi - c_minus) * (phi - c_plus + phi - c_minus);
+      ]]>
+    </evaluation>
+  </computed_vector>
+
+<sequence>
+    <!-- <integrate algorithm="ARK45" interval="10.0" tolerance="1e-4"> -->
+    <integrate algorithm="SI" iterations="3" interval="500.0" steps="50000">
+      <samples>100</samples>
+      <operators>
+        <integration_vectors>concentration</integration_vectors>
+        <operator kind="ex">
+          <operator_names>L</operator_names>
+          <![CDATA[
+            L = -kx * kx - ky * ky;
+          ]]>
+        </operator>
+        <operator kind="ip">
+          <operator_names> LL </operator_names>
+          <![CDATA[
+            LL = -0.25 * (kx * kx * kx * kx + ky * ky * ky * ky + 2 * kx * kx * ky * ky);
+          ]]>
+        </operator>
+        <dependencies>mu_bulk</dependencies>
+        <![CDATA[
+          dphi_dt = L[f] + LL[phi];
+        ]]>
+      </operators>
+    </integrate>
+  </sequence>
+
+  <output format="hdf5" filename="droplet.xsil">
+    <sampling_group initial_sample="yes" basis="x y">
+      <moments>Phi</moments>
+      <dependencies>concentration</dependencies>
+      <![CDATA[
+        Phi = phi.Re();
+      ]]>
+    </sampling_group>
+  </output>
+</simulation>

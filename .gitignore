@@ -1,0 +1,7 @@
+*.h5
+*.xsil
+Reaction_diffusion
+*.cc
+bimix
+Droplet
+.ipynb_checkpoints

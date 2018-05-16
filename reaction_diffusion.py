@@ -52,13 +52,14 @@ def five_pt_laplacian_sparse_periodic(m, a, b):
 
 def one_step_forward(u, v, k, A, delta, D1=0.5, D2=1.0):
     u_new = u + k * (delta * D1 * A * u + f(u, v))
-    v_new = v + k * (
-        delta * D2 * A * v + g(u, v))
+    v_new = v + k * (delta * D2 * A * v + g(u, v))
     return u_new, v_new
 
 
 def step_size(h, delta):
-    return h**2 / (5. * delta)
+    dt = h**2 / (5. * delta)
+    print("step size =", dt)
+    return dt
 
 
 def pattern_formation(m=10, T=1000):
@@ -66,8 +67,6 @@ def pattern_formation(m=10, T=1000):
     Model pattern formation by solving a reaction-diffusion PDE on a periodic
     square domain with an m x m grid.
     """
-    D1 = 0.5
-    D2 = 1.0
 
     # Set up the grid
     a = -1.
@@ -113,20 +112,102 @@ def pattern_formation(m=10, T=1000):
             plt.title(r"$t=%.3f$" % t)
             plt.show()
             plt.pause(0.5)
+
+
+def one_step_fft(u, v, k, A1, A2):
+    U = np.fft.fft2(u) * A1
+    V = np.fft.fft2(v) * A2
+    u_new = np.real(np.fft.ifft2(U))
+    v_new = np.real(np.fft.ifft2(V))
+    u_new += k * f(u_new, v_new)
+    v_new += k * g(u_new, v_new)
+    return u_new, v_new
+
+
+def pattern_formation2(m=10, T=1000):
+    """
+    Model pattern formation by solving a reaction-diffusion PDE on a periodic
+    square domain with an m x m grid.
+    """
+
+    # Set up the grid
+    a = -1.
+    b = 1.
+    h = (b - a) / m
+    # Grid spacing
+    x = np.linspace(a, b, m)  # Coordinates
+    y = np.linspace(a, b, m)
+    Y, X = np.meshgrid(y, x)
+
+    # Initial data
+    u = np.random.randn(m, m) / 2.
+    v = np.random.randn(m, m) / 2.
+
+    t = 0.  # Initial time
+    k = step_size(h, delta) * 2  # Time step size
+    N = int(round(T / k))   # Number of steps to take
+
+    A1 = np.zeros((m, m))
+    A2 = np.zeros((m, m))
+    for row in range(m):
+        for col in range(m):
+            tmp = 2 * np.cos(2 * np.pi * col / m) + 2 * np.cos(
+                2 * np.pi * row / m) - 4
+            tmp /= h ** 2
+            A1[row, col] = 1 / (1 - k * delta * D1 * tmp)
+            A2[row, col] = 1 / (1 - k * delta * D2 * tmp)
+
+    plt.clf()
+    plt.pcolormesh(x, y, u)
+    plt.colorbar()
+    plt.axis('image')
+    plt.draw()
+
+    # Now step forward in time
+    next_plot = 0
+    for j in range(N):
+        u, v = one_step_fft(u, v, k, A1, A2)
+        t = t + k
+        # Plot every t=5 units
+        if t > next_plot:
+            next_plot = next_plot + 5
             plt.clf()
+            plt.pcolormesh(x, y, u)
+            plt.colorbar()
+            plt.axis('image')
+            plt.title(r"$t=%.3f$" % t)
+            plt.show()
+            plt.pause(0.5)
+
+
+def load_h5(filename):
+    import h5py
+    f = h5py.File(filename, 'r')
+    t = f['1']['t']
+    x = f['1']['x']
+    y = f['1']['y']
+    u = f['1']['U']
+    # v = f['1']['V']
+    for i in range(t.size):
+        print(t[i])
+        plt.clf()
+        plt.pcolormesh(x, y, u[i])
+        plt.colorbar()
+        plt.axis("image")
+        plt.title(r"$t=%.3f$" % t[i])
+        plt.show()
+        plt.pause(0.1)
 
 
 if __name__ == "__main__":
+    plt.ion()
+    load_h5("reaction_diffusion.h5")
     delta = 0.0021
     tau1 = 3.5
     tau2 = 0
     alpha = 0.899
     beta = -0.91
     gamma = -alpha
-    A = five_pt_laplacian_sparse_periodic(5, -1., 1.)
-    plt.ion()
-    pattern_formation(m=120)
-    # plt.spy(A)
-    # plt.show()
-    # plt.pause(2)
-    # plt.close()
+    D1 = 0.5
+    D2 = 1.0
+    # pattern_formation2(m=120)

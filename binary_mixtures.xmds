@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simulation xmds-version="2">
+  <name>bimix</name>
+
+  <author>skyline</author>
+  <description>
+      Phase separation of binary liquids 
+  </description>
+
+  <features>
+    <benchmark />
+    <auto_vectorise />
+    <fftw plan="patient" />
+    <globals>
+      <![CDATA[
+        real chi = 4.0;
+        real lambda2 = 0.36;
+      ]]>
+    </globals>
+  </features>
+
+  <geometry>
+    <propagation_dimension> t </propagation_dimension>
+    <transverse_dimensions>
+      <dimension name="x" lattice="128" domain="(-64, 64)" />
+      <dimension name="y" lattice="128" domain="(-64, 64)" />
+    </transverse_dimensions>
+  </geometry>
+
+  <noise_vector name="UniformNoise" dimensions="x y" kind="uniform" type="real" method="dsfmt" seed="314 159 276">
+    <components>Eta</components>
+  </noise_vector>
+
+  <vector name="concentration" dimensions="x y" type="complex">
+    <components>phi</components>
+    <initialisation>
+      <dependencies>UniformNoise</dependencies>
+      <![CDATA[
+        phi = 0.5 + (Eta - 0.5) * 0.002;
+      ]]>
+    </initialisation>
+  </vector>
+
+  <computed_vector name="free_energy" dimensions="x y" type="complex">
+    <components>f</components>
+    <evaluation>
+      <dependencies> concentration </dependencies>
+      <![CDATA[
+        f = log(phi / (1 - phi)) - 2 * chi * phi;
+      ]]>
+    </evaluation>
+  </computed_vector>
+
+<sequence>
+    <integrate algorithm="ARK45" interval="10.0" tolerance="1e-4">
+    <!-- <integrate algorithm="SI" iterations="3" interval="5.0" steps="5000"> -->
+      <samples>20</samples>
+      <operators>
+        <integration_vectors>concentration</integration_vectors>
+        <operator kind="ex">
+          <operator_names>L LL</operator_names>
+          <![CDATA[
+            L = -kx * kx - ky * ky;
+            LL = - 2 * lambda2 * chi * L * L;
+          ]]>
+        </operator>
+        <dependencies>free_energy</dependencies>
+        <![CDATA[
+          dphi_dt = L[f] + LL[phi];
+        ]]>
+      </operators>
+    </integrate>
+  </sequence>
+
+  <output format="hdf5" filename="binary_mixture.xsil">
+    <sampling_group initial_sample="yes" basis="x y">
+      <moments>Phi</moments>
+      <dependencies>concentration</dependencies>
+      <![CDATA[
+        Phi = phi.Re();
+      ]]>
+    </sampling_group>
+  </output>
+</simulation>

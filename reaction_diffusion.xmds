@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simulation xmds-version="2">
+  <name>Reaction_diffusion</name>
+
+  <author>skyline</author>
+  <description>
+      Reaction-diffusion pattern formation in two spatial dimensions 
+  </description>
+
+  <features>
+    <benchmark />
+    <auto_vectorise />
+    <fftw plan="patient" />
+    <globals>
+      <![CDATA[
+        real delta = 0.0021;
+        real tau1 = 3.5;
+        real tau2 = 0;
+        real alpha = 0.899;
+        real beta = -0.91;
+        real gamma0 = -0.899;
+        real D1 = 0.5;
+        real D2 = 1;
+      ]]>
+    </globals>
+  </features>
+
+  <geometry>
+    <propagation_dimension> t </propagation_dimension>
+    <transverse_dimensions>
+      <dimension name="x" lattice="128" domain="(-1, 1)" />
+      <dimension name="y" lattice="128" domain="(-1, 1)" />
+    </transverse_dimensions>
+  </geometry>
+
+  <noise_vector name="UniformNoise" dimensions="x y" kind="uniform" type="real" method="dsfmt" seed="314 159 276">
+    <components>Eta1 Eta2</components>
+  </noise_vector>
+
+  <vector name="concentration" dimensions="x y" type="complex">
+    <components> u v </components>
+    <initialisation>
+      <dependencies>UniformNoise</dependencies>
+      <![CDATA[
+        u = Eta1;
+        v = Eta2;
+      ]]>
+    </initialisation>
+  </vector>
+
+  <computed_vector name="reaction" dimensions="x y" type="complex">
+    <components> f g </components>
+    <evaluation>
+      <dependencies> concentration </dependencies>
+      <![CDATA[
+        f = alpha * u * (1. - tau1 * v * v) + v * (1 - tau2 * u);
+        g = beta * v + alpha * tau1 * u * v * v + u * (gamma0 + tau2 * v);
+      ]]>
+    </evaluation>
+  </computed_vector>
+
+<sequence>
+    <!-- <integrate algorithm="ARK45" interval="100.0" tolerance="1e-5"> -->
+    <integrate algorithm="SI" iterations="3" interval="100.0" steps="5000">
+      <samples>10</samples>
+      <operators>
+        <integration_vectors>concentration</integration_vectors>
+        <operator kind="ip" dimensions="x">
+          <operator_names>Uxx Vxx</operator_names>
+          <![CDATA[
+            Uxx = -delta * D1 * (kx * kx);
+            Vxx = -delta * D2 * (kx * kx);
+          ]]>
+        </operator>
+        <operator kind="ip" dimensions="y">
+          <operator_names>Uyy Vyy</operator_names>
+          <![CDATA[
+            Uyy = -delta * D1 * (ky * ky);
+            Vyy = -delta * D2 * (ky * ky);
+          ]]>
+        </operator>
+        <dependencies>reaction</dependencies>
+        <![CDATA[
+          du_dt = Uxx[u] + Uyy[u] + f;
+          dv_dt = Vxx[v] + Vyy[v] + g;
+        ]]>
+      </operators>
+    </integrate>
+  </sequence>
+
+  <output format="hdf5" filename="reaction_diffusion.xsil">
+    <sampling_group initial_sample="yes" basis="x y">
+      <moments>U V</moments>
+      <dependencies>concentration</dependencies>
+      <![CDATA[
+        U = u.Re();
+        V = v.Re();
+      ]]>
+    </sampling_group>
+  </output>
+</simulation>
