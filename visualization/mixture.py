@@ -8,27 +8,32 @@ Study phase seperation of liquid mixtures by solving PDEs.
 
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 
 def load_h5(filename):
     import h5py
     f = h5py.File(filename, 'r')
     t = f['1']['t']
-    x = f['1']['x']
-    y = f['1']['y']
+    # x = f['1']['x']
+    # y = f['1']['y']
     phi = f['1']['Phi']
     # v = f['1']['V']
     for i in range(t.size):
         print(t[i], np.mean(phi[i]), np.max(phi[i]), np.min(phi[i]))
         plt.clf()
-        plt.pcolormesh(x, y, phi[i])
+        # plt.pcolormesh(x, y, phi[i])
+        plt.imshow(phi[i], origin="lower", aspect="equal")
         plt.colorbar()
         plt.axis("image")
         plt.title(r"$t=%.3f$" % t[i])
-        plt.show()
-        plt.pause(0.1)
+        plt.pause(0.05)
 
 
 if __name__ == "__main__":
     plt.ion()
-    load_h5("droplet.r0_2.h5")
+    # load_h5("droplet.eps_0.22.r0_3.5.turnover_1.2.h5")
+    # os.chdir("128_128")
+    # load_h5("droplet.eps_0.22.r0_3.5.turnover_1.2.h5")
+    os.chdir(r"D:\data\droplet\offset")
+    load_h5("c_dct.eps_0.22.prolate_0.r0_4.turnover_1.yoff_35.h5")

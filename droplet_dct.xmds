@@ -57,8 +57,8 @@
   <geometry>
     <propagation_dimension> t </propagation_dimension>
     <transverse_dimensions>
-      <dimension name="x" lattice="128" domain="(-32, 32)" />
-      <dimension name="y" lattice="128" domain="(-32, 32)" />
+      <dimension name="x" lattice="128" domain="(-32, 32)" transform="dct" />
+      <dimension name="y" lattice="64" domain="(-16, 16)" transform="dct" />
     </transverse_dimensions>
   </geometry>
 
@@ -68,7 +68,7 @@
     <components>Eta</components>
   </noise_vector>
 
-  <vector name="concentration" dimensions="x y" initial_basis="x y" type="complex">
+  <vector name="concentration" dimensions="x y" initial_basis="x y" type="real">
     <components>phi</components>
     <initialisation>
       <dependencies>UniformNoise</dependencies>
@@ -97,7 +97,7 @@
     </initialisation>
   </vector>
 
-  <computed_vector name="mu_bulk" dimensions="x y" type="complex">
+  <computed_vector name="mu_bulk" dimensions="x y" type="real">
     <components>f</components>
     <evaluation>
       <dependencies> concentration </dependencies>
@@ -107,14 +107,14 @@
     </evaluation>
   </computed_vector>
 
-  <computed_vector name="reaction" dimensions="x y" type="complex">
+  <computed_vector name="reaction" dimensions="x y" type="real">
     <components>s</components>
     <evaluation>
       <dependencies> concentration </dependencies>
       <![CDATA[
-        if (phi.Re() < cc_p)
+        if (phi < cc_p)
           s = nu_p + k_p * (c0_p - phi);
-        else if (phi.Re() > cc_m)
+        else if (phi > cc_m)
           s = -nu_m + k_m * (c0_m - phi);
         else
           s = p0 + p1 * phi + p2 * phi * phi + p3 * phi * phi * phi;
@@ -124,8 +124,8 @@
 
 <sequence>
     <!-- <integrate algorithm="ARK45" interval="10.0" tolerance="1e-4"> -->
-    <integrate algorithm="SI" iterations="3" interval="500.0" steps="50000">
-      <samples>100</samples>
+    <integrate algorithm="SI" iterations="3" interval="5000.0" steps="250000">
+      <samples>500</samples>
       <operators>
         <integration_vectors>concentration</integration_vectors>
         <operator kind="ex">
@@ -153,7 +153,7 @@
       <moments>Phi</moments>
       <dependencies>concentration</dependencies>
       <![CDATA[
-        Phi = phi.Re();
+        Phi = phi;
       ]]>
     </sampling_group>
   </output>

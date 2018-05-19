@@ -57,8 +57,8 @@
   <geometry>
     <propagation_dimension> t </propagation_dimension>
     <transverse_dimensions>
-      <dimension name="x" lattice="128" domain="(-32, 32)" />
-      <dimension name="y" lattice="128" domain="(-32, 32)" />
+      <dimension name="x" lattice="256" domain="(-64, 64)" transform="dct" />
+      <dimension name="y" lattice="256" domain="(-64, 64)" transform="dct" />
     </transverse_dimensions>
   </geometry>
 
@@ -68,17 +68,19 @@
     <components>Eta</components>
   </noise_vector>
 
-  <vector name="concentration" dimensions="x y" initial_basis="x y" type="complex">
+  <vector name="concentration" dimensions="x y" initial_basis="x y" type="real">
     <components>phi</components>
     <initialisation>
       <dependencies>UniformNoise</dependencies>
       <!-- one droplet in the center -->
       <![CDATA[
         real c_infty = c0_p + eps;
-        real dis = sqrt(x * x + y * y);
+        real xx = x * x;
+        real yy = (y-45) * (y-45);
+        real dis = sqrt(xx + yy);
         real aa = (r0 + prolate) * (r0 + prolate);
         real bb = (r0 - prolate) * (r0 - prolate);
-        if (x * x / aa + y * y / bb > 1)
+        if (xx / aa + yy / bb > 1)
           dis = -dis;
         phi = 0.5 * (c0_m + c_infty) + 0.5 * (c0_m - c_infty) * tanh(dis) + 0.01 * (Eta - 0.5);
       ]]>
@@ -97,7 +99,7 @@
     </initialisation>
   </vector>
 
-  <computed_vector name="mu_bulk" dimensions="x y" type="complex">
+  <computed_vector name="mu_bulk" dimensions="x y" type="real">
     <components>f</components>
     <evaluation>
       <dependencies> concentration </dependencies>
@@ -107,25 +109,29 @@
     </evaluation>
   </computed_vector>
 
-  <computed_vector name="reaction" dimensions="x y" type="complex">
+  <computed_vector name="reaction" dimensions="x y" type="real">
     <components>s</components>
     <evaluation>
       <dependencies> concentration </dependencies>
       <![CDATA[
-        if (phi.Re() < cc_p)
-          s = nu_p + k_p * (c0_p - phi);
-        else if (phi.Re() > cc_m)
-          s = -nu_m + k_m * (c0_m - phi);
-        else
-          s = p0 + p1 * phi + p2 * phi * phi + p3 * phi * phi * phi;
+        if (x * x + y * y < 3025) {
+            if (phi < cc_p)
+            s = nu_p + k_p * (c0_p - phi);
+            else if (phi > cc_m)
+            s = -nu_m + k_m * (c0_m - phi);
+            else
+            s = p0 + p1 * phi + p2 * phi * phi + p3 * phi * phi * phi;
+        } else {
+            s = phi * 0.1;
+        }
       ]]>
     </evaluation>
   </computed_vector>
 
 <sequence>
     <!-- <integrate algorithm="ARK45" interval="10.0" tolerance="1e-4"> -->
-    <integrate algorithm="SI" iterations="3" interval="500.0" steps="50000">
-      <samples>100</samples>
+    <integrate algorithm="SI" iterations="3" interval="1000.0" steps="10000">
+      <samples>500</samples>
       <operators>
         <integration_vectors>concentration</integration_vectors>
         <operator kind="ex">
@@ -148,12 +154,12 @@
     </integrate>
   </sequence>
 
-  <output format="hdf5" filename="droplet.xsil">
+  <output format="hdf5" filename="c_dct.xsil">
     <sampling_group initial_sample="yes" basis="x y">
       <moments>Phi</moments>
       <dependencies>concentration</dependencies>
       <![CDATA[
-        Phi = phi.Re();
+        Phi = phi;
       ]]>
     </sampling_group>
   </output>
