@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simulation xmds-version="2">
+  <name>Droplet</name>
+
+  <author>skyline</author>
+  <description>
+      Phase separation of binary liquids 
+  </description>
+
+  <features>
+    <benchmark />
+    <auto_vectorise />
+    <fftw plan="patient" />
+    <globals>
+      <![CDATA[
+        real c0_p = 0.;
+        real c0_m = 1.;
+        real k_p = 0.01;
+        real k_m = 0.01;
+        real nu_0 = 0.01;
+        real cc_p = c0_p + 0.25;
+        real cc_m = c0_m + 0.75;
+        real nu_p;
+        real nu_m;
+        real p0;
+        real p1;
+        real p2;
+        real p3;
+      ]]>
+    </globals>
+    <arguments append_args_to_output_filename="yes">
+      <argument name="eps" type="real" default_value="0.1" />
+      <argument name="turnover" type="real" default_value="1"/>
+      <argument name="r0" type="real" default_value="5" />
+      <argument name="x0" type="real" default_value="0" />
+      <argument name="prolate" type="real" default_value="0" />
+      <!-- <argument name="r1" type="real" default_value="5" /> -->
+      <![CDATA[
+        nu_p = eps * k_p;
+        nu_m = turnover * nu_0;
+        real b0 = nu_p + k_p * (c0_p - cc_p);
+        real b1 = -nu_m + k_m * (c0_m - cc_m);
+        real b2 = -k_p;
+        real b3 = -k_m;
+        real tmp = 1 / (cc_p - cc_m) / (cc_p - cc_m) / (cc_p - cc_m);
+        p0 = b0* cc_m * cc_m * (3 * cc_p - cc_m) + b1 * cc_p * cc_p * (cc_p - 3 * cc_m) + (b2 * cc_m + b3 * cc_p) * cc_p * cc_m * (cc_m - cc_p);
+        p1 = 6 * (b0 - b1) * cc_p * cc_m - b2 * cc_m * (2 * cc_p + cc_m) * (cc_p - cc_m) - b3 * cc_p * (cc_p - cc_m) * (cc_p + 2 * cc_m);
+        p2 = 3 * (b0 - b1) * (cc_p + cc_m) - b2 * (cc_p + 2 * cc_m) * (cc_p - cc_m) - b3 * (2 * cc_p + cc_m) * (cc_p - cc_m);
+        p3 = 2 * (b0 - b1) - (b2 + b3) * (cc_p - cc_m);
+        p0 *= tmp;
+        p1 *= -tmp;
+        p2 *= tmp;
+        p3 *= -tmp;
+      ]]>
+    </arguments>
+  </features>
+
+  <geometry>
+    <propagation_dimension> t </propagation_dimension>
+    <transverse_dimensions>
+      <dimension name="x" lattice="320" domain="(-80, 80)" transform="dct" />
+      <dimension name="y" lattice="256" domain="(-64, 64)" transform="dct" />
+    </transverse_dimensions>
+  </geometry>
+
+  <!-- <driver name="distributed-mpi" /> -->
+
+  <noise_vector name="UniformNoise" dimensions="x y" kind="uniform" type="real" method="dsfmt" seed="314 159 276">
+    <components>Eta</components>
+  </noise_vector>
+
+  <vector name="concentration" dimensions="x y" initial_basis="x y" type="real">
+    <components>phi</components>
+    <initialisation>
+      <dependencies>UniformNoise</dependencies>
+      <!-- one droplet in the center -->
+      <![CDATA[
+        real c_infty = c0_p + eps;
+        real xx = (x-x0) * (x-x0);
+        real yy = y * y;
+        real dis = sqrt(xx + yy);
+        real aa = (r0 + prolate) * (r0 + prolate);
+        real bb = (r0 - prolate) * (r0 - prolate);
+        if (xx / aa + yy / bb > 1)
+          dis = -dis;
+        phi = 0.5 * (c0_m + c_infty) + 0.5 * (c0_m - c_infty) * tanh(dis) + 0.01 * (Eta - 0.5);
+      ]]>
+      <!-- two droplets -->
+      <!-- <![CDATA[
+        real c_infty = c_plus + eps;
+        real dis1 = sqrt((x-32) * (x-32) + y * y);
+        if (dis1 > r0)
+          dis1 = -dis1;
+        real dis2 = sqrt((x+32) * (x+32) + y * y);
+        if (dis2 > r1)
+          dis2 = -dis2;
+        real h = 0.5 * (tanh(dis1) + tanh(dis2) + 2) * (c_minus - c_infty);
+        phi = c_infty + h + 0.01 * (Eta - 0.5);
+      ]]> -->
+    </initialisation>
+  </vector>
+
+  <computed_vector name="mu_bulk" dimensions="x y" type="real">
+    <components>f</components>
+    <evaluation>
+      <dependencies> concentration </dependencies>
+      <![CDATA[
+        f = (phi - c0_p) * (phi - c0_m) * (phi - c0_p + phi - c0_m);
+      ]]>
+    </evaluation>
+  </computed_vector>
+
+  <computed_vector name="reaction" dimensions="x y" type="real">
+    <components>s</components>
+    <evaluation>
+      <dependencies> concentration </dependencies>
+      <![CDATA[
+        if (x > -64 && x < 64) {
+            if (phi < cc_p)
+            s = nu_p + k_p * (c0_p - phi);
+            else if (phi > cc_m)
+            s = -nu_m + k_m * (c0_m - phi);
+            else
+            s = p0 + p1 * phi + p2 * phi * phi + p3 * phi * phi * phi;
+        } else {
+            s = -0.15 * phi;
+        }
+      ]]>
+    </evaluation>
+  </computed_vector>
+
+<sequence>
+    <!-- <integrate algorithm="ARK45" interval="10.0" tolerance="1e-4"> -->
+    <integrate algorithm="SI" iterations="3" interval="500.0" steps="10000">
+      <samples>200</samples>
+      <operators>
+        <integration_vectors>concentration</integration_vectors>
+        <operator kind="ex">
+          <operator_names>L</operator_names>
+          <![CDATA[
+            L = -kx * kx - ky * ky;
+          ]]>
+        </operator>
+        <operator kind="ip">
+          <operator_names> LL </operator_names>
+          <![CDATA[
+            LL = -0.25 * (kx * kx * kx * kx + ky * ky * ky * ky + 2 * kx * kx * ky * ky);
+          ]]>
+        </operator>
+        <dependencies>mu_bulk reaction</dependencies>
+        <![CDATA[
+          dphi_dt = L[f] + LL[phi] + s;
+        ]]>
+      </operators>
+    </integrate>
+  </sequence>
+
+  <output format="hdf5" filename="c_dct.xsil">
+    <sampling_group initial_sample="yes" basis="x y">
+      <moments>Phi</moments>
+      <dependencies>concentration</dependencies>
+      <![CDATA[
+        Phi = phi;
+      ]]>
+    </sampling_group>
+  </output>
+</simulation>

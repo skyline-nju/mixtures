@@ -10,7 +10,7 @@ def load_h5(filename):
     t = f['1']['t']
     X, Y, Z = np.mgrid[-25:25:100j, -25:25:100j, -25:25:100j]
     for i in range(t.size):
-        mlab.contour3d(X, Y, Z, phi[i], contours=[0.5])
+        mlab.contour3d(X, Y, Z, phi[i], contours=[0.5], transparent=True)
         mlab.axes(xlabel="x", ylabel="y", zlabel="z")
         mlab.show()
     mlab.close(all=True)
