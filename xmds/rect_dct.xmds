@@ -19,7 +19,7 @@
         real k_m = 0.01;
         real nu_0 = 0.01;
         real cc_p = c0_p + 0.25;
-        real cc_m = c0_m + 0.75;
+        real cc_m = c0_p + 0.75;
         real nu_p;
         real nu_m;
         real p0;

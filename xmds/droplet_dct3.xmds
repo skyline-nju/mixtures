@@ -19,7 +19,7 @@
         real k_m = 0.01;
         real nu_0 = 0.01;
         real cc_p = c0_p + 0.25;
-        real cc_m = c0_m + 0.75;
+        real cc_m = c0_p + 0.75;
         real nu_p;
         real nu_m;
         real p0;
@@ -57,28 +57,29 @@
   <geometry>
     <propagation_dimension> t </propagation_dimension>
     <transverse_dimensions>
-      <dimension name="x" lattice="128" domain="(-32, 32)" />
-      <dimension name="y" lattice="128" domain="(-32, 32)" />
+      <dimension name="x" lattice="100" domain="(-25, 25)" transform="dct" />
+      <dimension name="y" lattice="100" domain="(-25, 25)" transform="dct" />
+      <dimension name="z" lattice="100" domain="(-25, 25)" transform="dct" />
     </transverse_dimensions>
   </geometry>
 
   <!-- <driver name="distributed-mpi" /> -->
 
-  <noise_vector name="UniformNoise" dimensions="x y" kind="uniform" type="real" method="dsfmt" seed="314 159 276">
+  <noise_vector name="UniformNoise" dimensions="x y z" kind="uniform" type="real" method="dsfmt" seed="314 159 276">
     <components>Eta</components>
   </noise_vector>
 
-  <vector name="concentration" dimensions="x y" initial_basis="x y" type="complex">
+  <vector name="concentration" dimensions="x y z" initial_basis="x y z" type="real">
     <components>phi</components>
     <initialisation>
       <dependencies>UniformNoise</dependencies>
       <!-- one droplet in the center -->
       <![CDATA[
         real c_infty = c0_p + eps;
-        real dis = sqrt(x * x + y * y);
+        real dis = sqrt(x * x + y * y + z * z);
         real aa = (r0 + prolate) * (r0 + prolate);
         real bb = (r0 - prolate) * (r0 - prolate);
-        if (x * x / aa + y * y / bb > 1)
+        if (x * x / aa + y * y / bb  + z * z / bb > 1)
           dis = -dis;
         phi = 0.5 * (c0_m + c_infty) + 0.5 * (c0_m - c_infty) * tanh(dis) + 0.01 * (Eta - 0.5);
       ]]>
@@ -97,7 +98,7 @@
     </initialisation>
   </vector>
 
-  <computed_vector name="mu_bulk" dimensions="x y" type="complex">
+  <computed_vector name="mu_bulk" dimensions="x y z" type="real">
     <components>f</components>
     <evaluation>
       <dependencies> concentration </dependencies>
@@ -107,14 +108,14 @@
     </evaluation>
   </computed_vector>
 
-  <computed_vector name="reaction" dimensions="x y" type="complex">
+  <computed_vector name="reaction" dimensions="x y z" type="real">
     <components>s</components>
     <evaluation>
       <dependencies> concentration </dependencies>
       <![CDATA[
-        if (phi.Re() < cc_p)
+        if (phi < cc_p)
           s = nu_p + k_p * (c0_p - phi);
-        else if (phi.Re() > cc_m)
+        else if (phi > cc_m)
           s = -nu_m + k_m * (c0_m - phi);
         else
           s = p0 + p1 * phi + p2 * phi * phi + p3 * phi * phi * phi;
@@ -124,20 +125,20 @@
 
 <sequence>
     <!-- <integrate algorithm="ARK45" interval="10.0" tolerance="1e-4"> -->
-    <integrate algorithm="SI" iterations="3" interval="500.0" steps="50000">
-      <samples>100</samples>
+    <integrate algorithm="SI" iterations="3" interval="100.0" steps="2000">
+      <samples>25</samples>
       <operators>
         <integration_vectors>concentration</integration_vectors>
         <operator kind="ex">
           <operator_names>L</operator_names>
           <![CDATA[
-            L = -kx * kx - ky * ky;
+            L = -kx * kx - ky * ky - kz * kz;
           ]]>
         </operator>
         <operator kind="ip">
           <operator_names> LL </operator_names>
           <![CDATA[
-            LL = -0.25 * (kx * kx * kx * kx + ky * ky * ky * ky + 2 * kx * kx * ky * ky);
+            LL = -0.25 * (kx * kx + ky * ky + kz * kz) * (kx * kx + ky * ky + kz * kz);
           ]]>
         </operator>
         <dependencies>mu_bulk reaction</dependencies>
@@ -148,12 +149,12 @@
     </integrate>
   </sequence>
 
-  <output format="hdf5" filename="droplet.xsil">
-    <sampling_group initial_sample="yes" basis="x y">
+  <output format="hdf5" filename="dct3d.xsil">
+    <sampling_group initial_sample="yes" basis="x y z">
       <moments>Phi</moments>
       <dependencies>concentration</dependencies>
       <![CDATA[
-        Phi = phi.Re();
+        Phi = phi;
       ]]>
     </sampling_group>
   </output>

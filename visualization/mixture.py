@@ -22,11 +22,16 @@ def load_h5(filename):
     for i in range(t.size):
         print(t[i], np.mean(phi[i]), np.max(phi[i]), np.min(phi[i]))
         plt.clf()
+        plt.subplot(121)
         # plt.pcolormesh(x, y, phi[i])
         plt.imshow(phi[i], origin="lower", aspect="equal")
-        plt.colorbar()
+        plt.colorbar(orientation="horizontal")
         plt.axis("image")
         plt.title(r"$t=%.3f$" % t[i])
+        plt.subplot(122)
+        plt.imshow(
+            np.gradient(phi[i], axis=0), origin="lower", aspect="equal")
+        plt.colorbar(orientation="horizontal")
         plt.pause(0.05)
 
 
@@ -35,7 +40,7 @@ if __name__ == "__main__":
     # load_h5("droplet.eps_0.22.r0_3.5.turnover_1.2.h5")
     # os.chdir("128_128")
     # load_h5("droplet.eps_0.22.r0_3.5.turnover_1.2.h5")
-    os.chdir(r"D:\data\droplet\rect")
+    os.chdir(r"D:\data\droplet\droplet_2d")
     # load_h5("c_dct.eps_0.22.prolate_0.r0_4.turnover_1.yoff_35.h5")
     # os.chdir(r"..")
-    load_h5(r"c_dct.eps_0.22.prolate_0.r0_3.5.turnover_1.1.x0_30.h5")
+    load_h5(r"c_dct.eps_0.2.prolate_0.r0_3.5.turnover_0.6.x0_0.h5")
